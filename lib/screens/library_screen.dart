@@ -14,37 +14,49 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   List<Map<String, dynamic>> audiobooks = [];
 
-  Future<void> _loadAudiobooks() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['mp3', 'm4a', 'ogg', 'wav', 'flac'],
-      allowMultiple: true,
-    );
+Future<void> _loadAudiobooks() async {
+  String? directoryPath = await FilePicker.platform.getDirectoryPath();
 
-    if (result != null) {
-      List<PlatformFile> files = result.files;
+  if (directoryPath != null) {
+    Directory directory = Directory(directoryPath);
+    List<FileSystemEntity> files = directory.listSync();
 
-      setState(() {
-        audiobooks = files.map((file) {
-          String title = file.name;
-          String author = 'Author Placeholder';
-          String coverImage = 'assets/placeholder.jpg';
-
-          return {
-            'title': title,
-            'author': author,
-            'coverImage': coverImage,
-            'extension': file.extension,
-          };
-        }).toList();
-      });
+    print('📂 Selected directory: $directoryPath');
+    print('📄 All files in directory:');
+    for (var file in files) {
+      print('  - ${file.path}');
     }
+
+    setState(() {
+      audiobooks = files.where((file) {
+        String extension = file.path.split('.').last.toLowerCase();
+        return ['mp3', 'm4a', 'ogg', 'wav', 'flac'].contains(extension);
+      }).map((file) {
+        String title = file.path.split('/').last;
+        String author = 'Author Placeholder';
+        String coverImage = 'assets/placeholder.jpg';
+
+        return {
+          'title': title,
+          'author': author,
+          'coverImage': coverImage,
+          'path': file.path,
+        };
+      }).toList();
+
+      print('🎵 Filtered audiobooks:');
+      for (var book in audiobooks) {
+        print('  - ${book['title']} (${book['path']})');
+      }
+    });
+  } else {
+    print('❌ No directory selected.');
   }
+}
 
   @override
   void initState() {
     super.initState();
-//    _loadAudiobooks(); // Load audiobooks when the screen initializes
   }
 
   @override
