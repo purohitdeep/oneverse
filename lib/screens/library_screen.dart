@@ -1,8 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:one_verse/screens/book_info.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:logging/logging.dart';
+import 'package:one_verse/models/audio_book.dart';
+import 'package:one_verse/models/generic_book.dart';
+import 'package:one_verse/screens/book_info_screen.dart';
+import 'package:one_verse/services/model_creator_service.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -12,76 +16,92 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  List<Map<String, dynamic>> audiobooks = [];
+  final Logger _logger = Logger('LibraryScreen');
+  final ModelCreatorService _modelCreatorService = ModelCreatorService();
+  List<GenericBook> audiobooks = <GenericBook>[];
 
-Future<void> _loadAudiobooks() async {
-  String? directoryPath = await FilePicker.platform.getDirectoryPath();
+  Future<void> _loadAudiobooks() async {
+    String? directoryPath = await FilePicker.platform.getDirectoryPath();
 
-  if (directoryPath != null) {
-    Directory directory = Directory(directoryPath);
-    List<FileSystemEntity> files = directory.listSync();
+    if (directoryPath != null) {
+      Directory directory = Directory(directoryPath);
+      List<FileSystemEntity> files = directory.listSync();
 
-    print('📂 Selected directory: $directoryPath');
-    print('📄 All files in directory:');
-    for (var file in files) {
-      print('  - ${file.path}');
-    }
+      _logger.info('📂 Selected directory: $directoryPath');
+      _logger.info('📄 All files in directory: ${files.length} items');
 
-    setState(() {
-      audiobooks = files.where((file) {
-        String extension = file.path.split('.').last.toLowerCase();
-        return ['mp3', 'm4a', 'ogg', 'wav', 'flac'].contains(extension);
-      }).map((file) {
-        String title = file.path.split('/').last;
-        String author = 'Author Placeholder';
-        String coverImage = 'assets/placeholder.jpg';
+      List<GenericBook> loadedBooks = <GenericBook>[];
 
-        return {
-          'title': title,
-          'author': author,
-          'coverImage': coverImage,
-          'path': file.path,
-        };
-      }).toList();
-
-      print('🎵 Filtered audiobooks:');
-      for (var book in audiobooks) {
-        print('  - ${book['title']} (${book['path']})');
+      for (FileSystemEntity file in files) {
+        try {
+          GenericBook book = await _modelCreatorService
+              .createGenericBookModelFromFile(File(file.path));
+          loadedBooks.add(book);
+        } catch (e) {
+          _logger.severe('Error loading book from ${file.path}: $e');
+        }
       }
-    });
-  } else {
-    print('❌ No directory selected.');
+
+      setState(() {
+        audiobooks = loadedBooks;
+      });
+
+      _logger.fine('🎵 Filtered books: ${audiobooks.length} loaded');
+    } else {
+      _logger.warning('❌ No directory selected.');
+    }
   }
-}
 
   @override
   void initState() {
     super.initState();
+    // Optionally, you can call _loadAudiobooks() here or trigger via the button.
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Audiobook Library'),
+        title: const Text('Library'),
       ),
       body: audiobooks.isEmpty
           ? const Center(
-              child: Text('No audiobooks found. Please select a folder.'))
+              child: Text('No books found. Please select a folder which has all your books.'))
           : ListView.builder(
               itemCount: audiobooks.length,
-              itemBuilder: (context, index) {
-                final audiobook = audiobooks[index];
+              itemBuilder: (BuildContext context, int index) {
+                final GenericBook book = audiobooks[index];
+
                 return ListTile(
-                  leading: Image.asset(audiobook['coverImage']),
-                  title: Text(audiobook['title']),
-                  subtitle: Text(audiobook['author']),
+                  leading: book.coverImage != null
+                      ? Image.memory(
+                          book.coverImage!,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                        )
+                      : const Icon(Icons.audio_file,
+                          size: 50),
+
+                  title: Text(book.title),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(book.author),
+                      if (book is AudioBook)
+                        Text(
+                          book.duration,
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                    ],
+                  ),
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            BookInfoScreen(audiobook: audiobook),
+                      MaterialPageRoute<dynamic>(
+                        builder: (BuildContext context) =>
+                            BookInfoScreen(genericBook: book),
                       ),
                     );
                   },
@@ -93,8 +113,7 @@ Future<void> _loadAudiobooks() async {
           try {
             await _loadAudiobooks();
           } catch (e) {
-            print(
-                'Error picking directory: $e'); // Or display an error message to the user
+            _logger.severe('Error picking directory: $e');
           }
         },
         child: const Icon(Icons.folder_open),

@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:one_verse/screens/library_screen.dart';
 import 'package:one_verse/screens/player_screen.dart';
 import 'package:one_verse/screens/search_screen.dart';
 import 'package:one_verse/screens/settings_screen.dart';
 
 void main() {
+  _setupLogging();
   runApp(const OneVerse());
+}
+
+void _setupLogging() {
+  // Set the root level for logging. Level.ALL logs everything.
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((LogRecord record) {
+    // Use dart:developer for production-friendly logging
+    debugPrint(
+        '${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}');
+  });
 }
 
 class OneVerse extends StatelessWidget {
@@ -31,24 +43,24 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  Widget _currentScreen = const LibraryScreen();
+  Widget _currentScreen = const LibraryScreen() as Widget;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OneVerse App'),
+        title: const Text('OneVerse'),
       ),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
-          children: [
+          children: <Widget>[
             const DrawerHeader(
               decoration: BoxDecoration(
                 color: Colors.blue,
               ),
               child: Text(
-                'OneVerse App Menu',
+                'OneVerse',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 24,
