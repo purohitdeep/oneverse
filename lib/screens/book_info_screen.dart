@@ -1,6 +1,8 @@
+
 import 'package:flutter/material.dart';
 import 'package:one_verse/models/audio_book.dart';
 import 'package:one_verse/models/generic_book.dart';
+import 'package:one_verse/screens/audio_player_screen.dart';
 
 class BookInfoScreen extends StatelessWidget {
   final GenericBook genericBook;
@@ -47,7 +49,28 @@ class BookInfoScreen extends StatelessWidget {
                 'Duration: ${(genericBook as AudioBook).duration}',
                 style: const TextStyle(fontSize: 18),
               ),
-            // You can add more details here (summary, etc.)
+            const SizedBox(height: 20),
+
+            // Play Button (Only for AudioBook)
+            // Example persistent player instance; replace with your actual instance
+
+            if (genericBook is AudioBook)
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AudioPlayerScreen(
+                          audioBook: genericBook as AudioBook,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text("Play"),
+                ),
+              ),
           ],
         ),
       ),

@@ -5,14 +5,14 @@ import 'package:one_verse/screens/player_screen.dart';
 import 'package:one_verse/screens/search_screen.dart';
 import 'package:one_verse/screens/settings_screen.dart';
 
-class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+class App extends ConsumerStatefulWidget {
+  const App({super.key});
 
   @override
-  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<App> createState() => _AppState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _AppState extends ConsumerState<App> {
   // StateProvider to store the selected screen
   final selectedScreenProvider =
       StateProvider<Widget>((ref) => const LibraryScreen());

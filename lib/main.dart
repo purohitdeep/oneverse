@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
-import 'package:one_verse/screens/home_screen.dart';
+import '../app.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
@@ -31,7 +31,7 @@ class OneVerse extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const HomeScreen(), // Start with the Library screen
+      home: const App(), // Start with the Library screen
     );
   }
 }
