@@ -21,14 +21,19 @@ class AppStateNotifier extends StateNotifier<AppState> {
   }
 
   // 📌 Load selected folder from SharedPreferences when app starts
-  Future<void> _loadSavedFolder() async {
-    SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
-    String? savedFolder = sharedPreferences.getString('selected_library_folder');
-    if (savedFolder != null) {
-      state = state.copyWith(library: state.library.copyWith(selectedFolder: savedFolder));
-      await loadBooksFromFolder(savedFolder);
-    }
+Future<void> _loadSavedFolder() async {
+  SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
+  String? savedFolder = sharedPreferences.getString('selected_library_folder');
+  
+  if (savedFolder != null && Directory(savedFolder).existsSync()) {
+    // If the folder exists, proceed with loading
+    state = state.copyWith(library: state.library.copyWith(selectedFolder: savedFolder));
+    await loadBooksFromFolder(savedFolder);
+  } else {
+    // If the folder doesn't exist, clear the state
+    state = state.copyWith(library: state.library.copyWith(selectedFolder: null, books: []));
   }
+}
 
   // 📌 Update selected folder & load books
   Future<void> setLibraryFolder(String folderPath) async {
@@ -41,24 +46,30 @@ class AppStateNotifier extends StateNotifier<AppState> {
   }
 
   // 📌 Load Books from the Folder
-  Future<void> loadBooksFromFolder(String folderPath) async {
-    Directory directory = Directory(folderPath);
-    if (!directory.existsSync()) return;
-
-    List<FileSystemEntity> files = directory.listSync();
-    List<GenericBook> loadedBooks = [];
-
-    for (var file in files) {
-      try {
-        GenericBook book = await _modelCreatorService.createGenericBookModelFromFile(File(file.path));
-        loadedBooks.add(book);
-      } catch (e) {
-        print('Error loading book from ${file.path}: $e');
-      }
-    }
-
-    state = state.copyWith(library: state.library.copyWith(books: loadedBooks));
+Future<void> loadBooksFromFolder(String folderPath) async {
+  Directory directory = Directory(folderPath);
+  if (!directory.existsSync()) {
+    print('Directory does not exist: $folderPath');
+    return;
   }
+
+  List<FileSystemEntity> files = directory.listSync();
+  print('Found ${files.length} files in $folderPath');
+  List<GenericBook> loadedBooks = [];
+
+  for (var file in files) {
+    try {
+      print('Processing file: ${file.path}');
+      GenericBook book = await _modelCreatorService.createGenericBookModelFromFile(File(file.path));
+      loadedBooks.add(book);
+    } catch (e) {
+      print('Error loading book from ${file.path}: $e');
+    }
+  }
+  
+  print('Loaded ${loadedBooks.length} books');
+  state = state.copyWith(library: state.library.copyWith(books: loadedBooks));
+}
 
   // 📌 Audiobook Controls
   void playAudio(String trackPath) {
