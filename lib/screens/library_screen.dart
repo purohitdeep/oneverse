@@ -1,87 +1,43 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:logging/logging.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:one_verse/models/audio_book.dart';
 import 'package:one_verse/models/generic_book.dart';
 import 'package:one_verse/screens/book_info_screen.dart';
-import 'package:one_verse/services/model_creator_service.dart';
+import 'package:one_verse/state_provider/app_state_notifier.dart';
 
-class LibraryScreen extends StatefulWidget {
+class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
 
-  @override
-  State<LibraryScreen> createState() => _LibraryScreenState();
-}
-
-class _LibraryScreenState extends State<LibraryScreen> {
-  final Logger _logger = Logger('LibraryScreen');
-  final ModelCreatorService _modelCreatorService = ModelCreatorService();
-  List<GenericBook> audiobooks = <GenericBook>[];
-
-  Future<void> _loadAudiobooks() async {
-    String? directoryPath = await FilePicker.platform.getDirectoryPath();
-
-    if (directoryPath != null) {
-      Directory directory = Directory(directoryPath);
-      List<FileSystemEntity> files = directory.listSync();
-
-      _logger.info('📂 Selected directory: $directoryPath');
-      _logger.info('📄 All files in directory: ${files.length} items');
-
-      List<GenericBook> loadedBooks = <GenericBook>[];
-
-      for (FileSystemEntity file in files) {
-        try {
-          GenericBook book = await _modelCreatorService
-              .createGenericBookModelFromFile(File(file.path));
-          loadedBooks.add(book);
-        } catch (e) {
-          _logger.severe('Error loading book from ${file.path}: $e');
-        }
-      }
-
-      setState(() {
-        audiobooks = loadedBooks;
-      });
-
-      _logger.fine('🎵 Filtered books: ${audiobooks.length} loaded');
-    } else {
-      _logger.warning('❌ No directory selected.');
+  Future<void> _pickFolder(WidgetRef ref) async {
+    String? folderPath = await FilePicker.platform.getDirectoryPath();
+    if (folderPath != null) {
+      ref.read(appStateProvider.notifier).setLibraryFolder(folderPath);
     }
   }
 
   @override
-  void initState() {
-    super.initState();
-    // Optionally, you can call _loadAudiobooks() here or trigger via the button.
-  }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appState = ref.watch(appStateProvider);
+    final selectedFolder = appState.library.selectedFolder;
+    final books = appState.library.books;
 
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Library'),
+        title: Text('Library ${selectedFolder != null ? '($selectedFolder)' : ''}'),
       ),
-      body: audiobooks.isEmpty
-          ? const Center(
-              child: Text('No books found. Please select a folder which has all your books.'))
+      body: books.isEmpty
+          ? const Center(child: Text('No books found. Please select a root folder, where you have all your books.'))
           : ListView.builder(
-              itemCount: audiobooks.length,
+              itemCount: books.length,
               itemBuilder: (BuildContext context, int index) {
-                final GenericBook book = audiobooks[index];
+                
+                final GenericBook book = books[index];
 
                 return ListTile(
                   leading: book.coverImage != null
-                      ? Image.memory(
-                          book.coverImage!,
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                        )
-                      : const Icon(Icons.audio_file,
-                          size: 50),
+                      ? Image.memory(book.coverImage!, width: 50, height: 50, fit: BoxFit.cover)
+                      : const Icon(Icons.audio_file, size: 50),
 
                   title: Text(book.title),
                   subtitle: Column(
@@ -91,8 +47,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       if (book is AudioBook)
                         Text(
                           book.duration,
-                          style:
-                              TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                         ),
                     ],
                   ),
@@ -100,8 +55,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute<dynamic>(
-                        builder: (BuildContext context) =>
-                            BookInfoScreen(genericBook: book),
+                        builder: (BuildContext context) => BookInfoScreen(genericBook: book),
                       ),
                     );
                   },
@@ -109,13 +63,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               },
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          try {
-            await _loadAudiobooks();
-          } catch (e) {
-            _logger.severe('Error picking directory: $e');
-          }
-        },
+        onPressed: () => _pickFolder(ref),
         child: const Icon(Icons.folder_open),
       ),
     );

@@ -4,10 +4,15 @@ import 'package:one_verse/screens/library_screen.dart';
 import 'package:one_verse/screens/player_screen.dart';
 import 'package:one_verse/screens/search_screen.dart';
 import 'package:one_verse/screens/settings_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   _setupLogging();
-  runApp(const OneVerse());
+  runApp(
+    ProviderScope(
+      child: const OneVerse(),
+    ),
+  );
 }
 
 void _setupLogging() {
@@ -35,82 +40,54 @@ class OneVerse extends StatelessWidget {
   }
 }
 
-class MainScreen extends StatefulWidget {
+class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
-  Widget _currentScreen = const LibraryScreen() as Widget;
 
+class _MainScreenState extends ConsumerState<MainScreen> {
+final selectedScreenProvider = StateProvider<Widget>((ref) => const LibraryScreen());
   @override
   Widget build(BuildContext context) {
+    final selectedScreen = ref.watch(selectedScreenProvider);
+    
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('OneVerse'),
-      ),
+      appBar: AppBar(title: const Text('OneVerse')),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: <Widget>[
             const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blue,
-              ),
-              child: Text(
-                'OneVerse',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                ),
-              ),
+              decoration: BoxDecoration(color: Colors.blue),
+              child: Text('OneVerse', style: TextStyle(color: Colors.white, fontSize: 24)),
             ),
             ListTile(
               leading: const Icon(Icons.library_books),
               title: const Text('Library'),
-              onTap: () {
-                setState(() {
-                  _currentScreen = const LibraryScreen();
-                });
-                Navigator.pop(context); // Close the drawer
-              },
+              onTap: () => ref.read(selectedScreenProvider.notifier).state = const LibraryScreen(),
             ),
             ListTile(
               leading: const Icon(Icons.play_circle),
               title: const Text('Player'),
-              onTap: () {
-                setState(() {
-                  _currentScreen = const PlayerScreen();
-                });
-                Navigator.pop(context);
-              },
+              onTap: () => ref.read(selectedScreenProvider.notifier).state = const PlayerScreen(),
             ),
             ListTile(
               leading: const Icon(Icons.search),
               title: const Text('Search'),
-              onTap: () {
-                setState(() {
-                  _currentScreen = const SearchScreen();
-                });
-                Navigator.pop(context);
-              },
+              onTap: () => ref.read(selectedScreenProvider.notifier).state = const SearchScreen(),
             ),
             ListTile(
               leading: const Icon(Icons.settings),
               title: const Text('Settings'),
-              onTap: () {
-                setState(() {
-                  _currentScreen = const SettingsScreen();
-                });
-                Navigator.pop(context);
-              },
+              onTap: () => ref.read(selectedScreenProvider.notifier).state = const SettingsScreen(),
             ),
           ],
         ),
       ),
-      body: _currentScreen,
+      body: selectedScreen,
     );
   }
 }
