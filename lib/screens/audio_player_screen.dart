@@ -21,7 +21,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     _player = AudioPlayer();
     _player.setReleaseMode(ReleaseMode.stop);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Assuming your AudioBook has an 'assetPath' property.
+      // Set up your audio source and start playing
       await _player.setSource(DeviceFileSource(widget.audioBook.filePath!));
       await _player.resume();
     });
@@ -35,28 +35,80 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Wrap the body in a container so you can set a background color or gradient
     return Scaffold(
       appBar: AppBar(title: Text(widget.audioBook.title)),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Display album art if available!
-          widget.audioBook.coverImage != null
-              ? Image.memory(
-                  widget.audioBook.coverImage!,
-                  width: 200,
-                  height: 200,
-                  fit: BoxFit.fill,
-                )
-              : Container(
-                  width: 200,
-                  height: 200,
-                  color: Colors.grey,
-                  child: const Icon(Icons.audiotrack, size: 80),
+      body: Container(
+        width: double.infinity,
+        // Example: a simple background color (adjust or replace with gradient)
+        color: Colors.black87,
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              // ALBUM ART
+              _buildAlbumArt(),
+              const SizedBox(height: 20),
+              // TITLE (e.g., Chapter title)
+              Text(
+                widget.audioBook.title, // or use widget.audioBook.title if you prefer
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
-          const SizedBox(height: 20),
-          // Here comes the fancy player controls widget!
-          PlayerWidget(player: _player),
+              ),
+
+              // MAIN CONTROLS & PROGRESS
+              Expanded(
+                child: Center(
+                  child: PlayerWidget(player: _player),
+                ),
+              ),
+
+              // OPTIONAL EXTRA ROW FOR SPEED / CAR MODE / TIMER / BOOKMARK
+              // Uncomment if you want more controls
+              _buildExtraControls(),
+
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAlbumArt() {
+    final coverImage = widget.audioBook.coverImage;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16.0), // Rounded corners
+      child: coverImage != null
+          ? Image.memory(
+              coverImage,
+              width: 300,
+              height: 300,
+              fit: BoxFit.cover,
+            )
+          : Container(
+              width: 300,
+              height: 300,
+              color: Colors.grey,
+              child: const Icon(Icons.audiotrack, size: 80),
+            ),
+    );
+  }
+
+  // Optional extra row at bottom
+  Widget _buildExtraControls() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: const [
+          Text("1.0x", style: TextStyle(color: Colors.white)),
+          //Icon(Icons.directions_car, color: Colors.white),
+          Icon(Icons.timer, color: Colors.white),
+          Icon(Icons.bookmark_border, color: Colors.white),
         ],
       ),
     );
@@ -82,12 +134,30 @@ class _PlayerWidgetState extends State<PlayerWidget> {
   StreamSubscription? _playerStateChangeSubscription;
 
   bool get _isPlaying => _playerState == PlayerState.playing;
-  bool get _isPaused => _playerState == PlayerState.paused;
 
   String get _durationText =>
-      _duration != null ? _duration.toString().split('.').first : '0:00';
+      _duration != null ? _printDuration(_duration!) : "0:00";
   String get _positionText =>
-      _position != null ? _position.toString().split('.').first : '0:00';
+      _position != null ? _printDuration(_position!) : "0:00";
+
+  /// Simple helper to show "mm:ss" or "hh:mm:ss" format
+  String _printDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    if (hours > 0) {
+      return "${twoDigits(hours)}:${twoDigits(minutes)}:${twoDigits(seconds)}";
+    }
+    return "${twoDigits(minutes)}:${twoDigits(seconds)}";
+  }
+
+  /// If you want “time left” in the middle, this calculates it
+  String get _timeLeftText {
+    if (_duration == null || _position == null) return "";
+    final diff = _duration! - _position!;
+    return "${diff.inMinutes}m ${diff.inSeconds.remainder(60)}s left";
+  }
 
   AudioPlayer get player => widget.player;
 
@@ -146,49 +216,58 @@ class _PlayerWidgetState extends State<PlayerWidget> {
     setState(() => _playerState = PlayerState.paused);
   }
 
-  Future<void> _stop() async {
-    await player.stop();
-    setState(() {
-      _playerState = PlayerState.stopped;
-      _position = Duration.zero;
-    });
+  Future<void> _skipBack30() async {
+    final currentPosition = _position ?? Duration.zero;
+    // Rewind 30 seconds, but not below 0
+    Duration newPosition = currentPosition - const Duration(seconds: 30);
+    if (newPosition < Duration.zero) {
+      newPosition = Duration.zero;
+    }
+    await player.seek(newPosition);
+  }
+
+  Future<void> _skipForward30() async {
+    final currentPosition = _position ?? Duration.zero;
+    // Fast-forward 30 seconds, but not beyond total duration
+    Duration newPosition = currentPosition + const Duration(seconds: 30);
+    if (_duration != null && newPosition > _duration!) {
+      newPosition = _duration!;
+    }
+    await player.seek(newPosition);
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).primaryColor;
     return Column(
+      // Space things out a bit
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Play, Pause, and Stop buttons—like the control panel of a spaceship!
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              key: const Key('play_button'),
-              onPressed: _isPlaying ? null : _play,
-              iconSize: 48.0,
-              icon: const Icon(Icons.play_arrow),
-              color: color,
-            ),
-            IconButton(
-              key: const Key('pause_button'),
-              onPressed: _isPlaying ? _pause : null,
-              iconSize: 48.0,
-              icon: const Icon(Icons.pause),
-              color: color,
-            ),
-            IconButton(
-              key: const Key('stop_button'),
-              onPressed: _isPlaying || _isPaused ? _stop : null,
-              iconSize: 48.0,
-              icon: const Icon(Icons.stop),
-              color: color,
-            ),
-          ],
+        // PROGRESS BAR DETAILS: current time, time left, total time
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _positionText,
+                style: const TextStyle(color: Colors.white),
+              ),
+              Text(
+                _timeLeftText,
+                style: const TextStyle(color: Colors.white),
+              ),
+              Text(
+                _durationText,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
         ),
-        // A slider to show the audio progress (slide to your heart's content!)
+
+        // SLIDER
         Slider(
+          activeColor: Colors.white,
+          inactiveColor: Colors.white54,
           onChanged: (value) {
             if (_duration == null) return;
             final position = value * _duration!.inMilliseconds;
@@ -201,10 +280,32 @@ class _PlayerWidgetState extends State<PlayerWidget> {
               ? _position!.inMilliseconds / _duration!.inMilliseconds
               : 0.0,
         ),
-        // Display current time versus total duration
-        Text(
-          '$_positionText / $_durationText',
-          style: const TextStyle(fontSize: 16.0),
+
+        // BUTTONS: skip-back-30, play/pause, skip-forward-30
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              onPressed: _skipBack30,
+              icon: const Icon(Icons.replay_30),
+              iconSize: 40,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 20),
+            IconButton(
+              onPressed: _isPlaying ? _pause : _play,
+              icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+              iconSize: 60,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 20),
+            IconButton(
+              onPressed: _skipForward30,
+              icon: const Icon(Icons.forward_30),
+              iconSize: 40,
+              color: Colors.white,
+            ),
+          ],
         ),
       ],
     );
